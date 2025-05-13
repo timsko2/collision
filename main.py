@@ -1,35 +1,164 @@
 import discord
+from discord.ext import commands
 from dotenv import load_dotenv
 import os
+from match import Match
+from match_status import MatchStatus
+from bet import Bet
 
 load_dotenv()
 
-class MyClient(discord.Client):
-    async def on_ready(self):
-        print(f'Logged on as {self.user}!')
+# Configuration des Intents
+intents = discord.Intents.default()  # Active les intents de base
+intents.message_content = True        # Nécessaire pour lire les messages
+intents.members = True               # Nécessaire pour voir les membres (si utilisé)
 
-    async def on_message(self, message):
-        # Ne pas répondre à soi-même pour éviter les boucles infinies
-        if message.author == self.user:
-            return
-        
-        print(f'Message from {message.author}: {message.content}')
-        
-        # Répondre à un message spécifique
-        if message.content.lower() == 'bonjour':
-            await message.channel.send(f'Salut {message.author.mention}!')
-        
-        # Répondre par une réaction
-        if 'python' in message.content.lower():
-            await message.add_reaction('🐍')
+# Dictionnaire pour stocker les matches {id: Match}
+matches = {}
+current_id_match = 1  # Compteur pour générer des IDs
+bets={}
+user_scores = {}
+point_grid = [10, 7, 5, 3, 1]
 
-intents = discord.Intents.default()
-intents.message_content = True
 
-client = MyClient(intents=intents)
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+bot = commands.Bot(
+    command_prefix="!", 
+    intents=intents  # <-- Intents passés ici
+)
+
+
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+
+@bot.command()
+async def create_match(ctx, team1: str, team2: str):
+    """Crée un nouveau match entre deux équipes avec un ID unique"""
+    global current_id_match
+    
+    new_match = Match(team1, team2)
+    matches[current_id_match] = new_match
+    await ctx.send(f"✅ Match créé (ID: {current_id_match}): {new_match}")
+    current_id_match += 1
+
+
+@bot.command()
+async def list_matches(ctx):
+    """Affiche la liste de tous les matches"""
+    if not matches:
+        await ctx.send("ℹ️ Aucun match enregistré.")
+        return
+    
+    embed = discord.Embed(
+        title="📋 Liste des Matches",
+        color=discord.Color.blurple()
+    )
+    
+    for match_id, match in matches.items():
+        embed.add_field(
+            name=f"🔢 ID {match_id}",
+            value=f"{match}",
+            inline=False
+        )
+    
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def start_match(ctx, match_id : int):
+    if match_id not in matches:
+        await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
+        return
+    m = matches[match_id]
+    if m.getstatus() == MatchStatus.NOT_STARTED:
+        m.score = (0,0)
+    else:
+        await ctx.send("Attention on ne peut démarrer qu'un match n'ayant jamais été démarré")
+        return
+    await ctx.send(f"Match lancé : {m}")
+    return
+
+@bot.command()
+async def stop_match(ctx, match_id : int, score1 : int, score2 : int):
+    if match_id not in matches:
+        await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
+        return
+    m = matches[match_id]
+    m.score = (score1, score2)
+    for bet in bets[match_id]:
+        bet.score_reel1, bet.score_reel2 = score1, score2
+    ranked_bets = get_rank_bets(match_id)
+    update_score(ranked_bets)
+    await ctx.send(f"Match arrêté : {m}")
+
+@bot.command()
+async def bet(ctx, match_id : int, score1 : int, score2 : int):
+    author = ctx.author
+    if match_id not in matches:
+        await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
+        return
+    m = matches[match_id]
+    if m.getstatus() == MatchStatus.STARTED or m.getstatus == MatchStatus.FINISHED:
+        await ctx.send("Ce match a déja commencé")
+        return
+    if author in get_betters(match_id):
+        await ctx.send("Vous avez déjà parié sur ce match")
+        return
+    bet = Bet(author, score1, score2)
+    if match_id not in bets:
+        bets[match_id] = []
+    bets[match_id].append(bet)
+    await ctx.send("Pari bien pris en compte")
+
+def get_betters(match_id: int):
+    betters = []
+    if match_id not in bets:
+        return []
+    for bet in bets[match_id]:
+        betters.append(bet.author)
+    return betters
+def get_rank_bets(match_id: int):
+    bets_copy = bets[match_id].copy()
+    if match_id not in matches:
+        raise ValueError
+    m = matches[match_id]
+    if m.getstatus() != MatchStatus.FINISHED:
+        raise ValueError("Cette méthode ne peut être appellée que sur des matchs finis")
+    if match_id not in bets:
+        return None
+    bets_copy.sort()
+    return bets_copy
+@bot.command()
+async def display_bets(ctx, match_id: int):
+    await ctx.send(f"{bets[match_id]}")
+    return
+
+@bot.command()
+async def display_ranked_bets(ctx, match_id: int):
+    await ctx.send(f"{get_rank_bets(match_id)}")
+    return
+
+def update_score(ranked_bets):
+    for i in range(min(5,len(ranked_bets))):
+        user = ranked_bets[i].author.name
+        if user not in user_scores:
+            user_scores[user] = 0
+        user_scores[user] += point_grid[i]
+    return
+   
+@bot.command()
+async def display_scores(ctx):
+    await ctx.send(f"{user_scores}")
+    return
+
+@bot.command()
+async def roles(ctx, member: discord.Member = None):
+    # Si aucun membre n'est mentionné, on prend l'auteur du message
+    member = member or ctx.author
+    
+    # Liste des rôles du membre (exclut le rôle @everyone)
+    roles = [role.name for role in member.roles if role.name != "@everyone"]
+    
+    await ctx.send(f"{member.display_name} a les rôles: {', '.join(roles) if roles else 'Aucun rôle'}")
 
 if DISCORD_TOKEN is None:
     print("Erreur: Le token Discord n'a pas été trouvé dans le fichier .env")
 else:
-    client.run(DISCORD_TOKEN)
+    bot.run(DISCORD_TOKEN)
