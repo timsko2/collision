@@ -5,6 +5,7 @@ import os
 from match import Match
 from match_status import MatchStatus
 from bet import Bet
+from help import help_commands
 
 load_dotenv()
 
@@ -25,12 +26,19 @@ bot = commands.Bot(
     command_prefix="!", 
     intents=intents  # <-- Intents passés ici
 )
-
+help_commands(bot)
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
+def get_roles(member: discord.Member = None):
+    roles = [role.name for role in member.roles if role.name != "@everyone"]
+    return roles
+
 @bot.command()
 async def create_match(ctx, team1: str, team2: str):
+    if 'Modo_bot' not in get_roles(ctx.author):
+        await ctx.send("Erreur : vous n'avez pas la permission pour effectuer cette commande")
+        return
     """Crée un nouveau match entre deux équipes avec un ID unique"""
     global current_id_match
     
@@ -63,6 +71,9 @@ async def list_matches(ctx):
 
 @bot.command()
 async def start_match(ctx, match_id : int):
+    if 'Modo_bot' not in get_roles(ctx.author):
+        await ctx.send("Erreur : vous n'avez pas la permission pour effectuer cette commande")
+        return
     if match_id not in matches:
         await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
         return
@@ -77,6 +88,9 @@ async def start_match(ctx, match_id : int):
 
 @bot.command()
 async def stop_match(ctx, match_id : int, score1 : int, score2 : int):
+    if 'Modo_bot' not in get_roles(ctx.author):
+        await ctx.send("Erreur : vous n'avez pas la permission pour effectuer cette commande")
+        return
     if match_id not in matches:
         await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
         return
@@ -90,6 +104,7 @@ async def stop_match(ctx, match_id : int, score1 : int, score2 : int):
 
 @bot.command()
 async def bet(ctx, match_id : int, score1 : int, score2 : int):
+
     author = ctx.author
     if match_id not in matches:
         await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
@@ -127,6 +142,9 @@ def get_rank_bets(match_id: int):
     return bets_copy
 @bot.command()
 async def display_bets(ctx, match_id: int):
+    if match_id not in bets:
+        await ctx.send("Il n'y a aucun pari sur ce match")
+        return
     await ctx.send(f"{bets[match_id]}")
     return
 
@@ -154,7 +172,7 @@ async def roles(ctx, member: discord.Member = None):
     member = member or ctx.author
     
     # Liste des rôles du membre (exclut le rôle @everyone)
-    roles = [role.name for role in member.roles if role.name != "@everyone"]
+    roles = get_roles(member)
     
     await ctx.send(f"{member.display_name} a les rôles: {', '.join(roles) if roles else 'Aucun rôle'}")
 
