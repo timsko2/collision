@@ -217,6 +217,11 @@ async def display_scores(ctx):
     await ctx.send(embed=embed)
 
 @bot.command()
+async def timsko(ctx):
+    await ctx.send("Oui mon frero 👍🏽")
+    return
+
+@bot.command()
 async def roles(ctx, member: discord.Member = None):
     # Si aucun membre n'est mentionné, on prend l'auteur du message
     member = member or ctx.author
