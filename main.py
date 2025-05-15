@@ -97,7 +97,7 @@ async def stop_match(ctx, match_id : int, score1 : int, score2 : int):
     m = matches[match_id]
     m.score = (score1, score2)
     for bet in bets[match_id]:
-        bet.score_reel1, bet.score_reel2 = score1, score2
+        bet.set_score_reel(score1, score2)
     ranked_bets = get_rank_bets(match_id)
     update_score(ranked_bets)
     await ctx.send(f"Match arrêté : {m}")
