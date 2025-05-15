@@ -78,8 +78,9 @@ async def start_match(ctx, match_id : int):
         await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
         return
     m = matches[match_id]
-    if m.getstatus() == MatchStatus.NOT_STARTED:
+    if m.status == MatchStatus.NOT_STARTED:
         m.score = (0,0)
+        m.status = MatchStatus.STARTED
     else:
         await ctx.send("Attention on ne peut démarrer qu'un match n'ayant jamais été démarré")
         return
@@ -96,8 +97,10 @@ async def stop_match(ctx, match_id : int, score1 : int, score2 : int):
         return
     m = matches[match_id]
     m.score = (score1, score2)
-    for bet in bets[match_id]:
-        bet.set_score_reel(score1, score2)
+    m.status = MatchStatus.FINISHED
+    if match_id in bets:
+        for bet in bets[match_id]:
+            bet.set_score_reel(score1, score2)
     ranked_bets = get_rank_bets(match_id)
     update_score(ranked_bets)
     await ctx.send(f"Match arrêté : {m}")
@@ -110,7 +113,7 @@ async def bet(ctx, match_id : int, score1 : int, score2 : int):
         await ctx.send("Erreur : l'ID indiqué ne corespond à aucun match")
         return
     m = matches[match_id]
-    if m.getstatus() == MatchStatus.STARTED or m.getstatus == MatchStatus.FINISHED:
+    if m.getstatus() == MatchStatus.STARTED or m.getstatus() == MatchStatus.FINISHED:
         await ctx.send("Ce match a déja commencé")
         return
     if author in get_betters(match_id):
@@ -130,6 +133,8 @@ def get_betters(match_id: int):
         betters.append(bet.author)
     return betters
 def get_rank_bets(match_id: int):
+    if match_id not in bets:
+        return []
     bets_copy = bets[match_id].copy()
     if match_id not in matches:
         raise ValueError
@@ -154,11 +159,16 @@ async def display_ranked_bets(ctx, match_id: int):
     return
 
 def update_score(ranked_bets):
-    for i in range(min(5,len(ranked_bets))):
+    p = 0
+    n = min(5,len(ranked_bets))
+    for i in range(n):
         user = ranked_bets[i].author.name
         if user not in user_scores:
             user_scores[user] = 0
-        user_scores[user] += point_grid[i]
+        user_scores[user] += point_grid[p]
+        if i+1 < n:
+            if ranked_bets[i].loss != ranked_bets[i+1].loss:
+                p = i+1
     return
    
 @bot.command()
