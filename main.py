@@ -173,8 +173,48 @@ def update_score(ranked_bets):
    
 @bot.command()
 async def display_scores(ctx):
-    await ctx.send(f"{user_scores}")
-    return
+    # Vérifie si le dictionnaire est vide
+    if not user_scores:
+        embed = discord.Embed(
+            title="🏆 Classement des parieurs",
+            description="Aucun score à afficher pour le moment.\nPlacez des paris pour apparaître ici !",
+            color=0x7289da
+        )
+        embed.set_footer(text="Utilisez !bet pour commencer à parier !")
+        await ctx.send(embed=embed)
+        return
+
+    # Trie les utilisateurs par score décroissant
+    sorted_scores = sorted(user_scores.items(), key=lambda item: item[1], reverse=True)
+
+    # Crée l'embed
+    embed = discord.Embed(
+        title="🏆 Classement des parieurs",
+        description="Voici les scores de tous les participants :",
+        color=0x00ff00  # Couleur verte pour symboliser la réussite
+    )
+
+    # Ajoute chaque utilisateur avec son score et une médaille si dans le top 3
+    for index, (user, score) in enumerate(sorted_scores, start=1):
+        if index == 1:
+            medal = "🥇"
+        elif index == 2:
+            medal = "🥈"
+        elif index == 3:
+            medal = "🥉"
+        else:
+            medal = "🔹"
+        
+        embed.add_field(
+            name=f"{medal} {index}. {user}",
+            value=f"**Score:** {score} points",
+            inline=False
+        )
+
+    # Pied de page
+    embed.set_footer(text="Continuez à parier pour grimper dans le classement !")
+    
+    await ctx.send(embed=embed)
 
 @bot.command()
 async def roles(ctx, member: discord.Member = None):

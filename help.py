@@ -1,5 +1,6 @@
 import discord
 def help_commands(bot):
+
     @bot.command()
     async def help_command(ctx):
         embed = discord.Embed(
@@ -24,6 +25,12 @@ def help_commands(bot):
         embed.add_field(
             name="💰 Placer un pari",
             value="`!bet [ID_Match] [score1] [score2]`\nPariez sur le score final d'un match",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🚦 Démarrer un match (bloque les paris)",
+            value="`!start_match [ID_Match]`\nDémarre le match et bloque les nouveaux paris",
             inline=False
         )
         

@@ -10,6 +10,7 @@ class Match:
         self.team1 = team1
         self.team2 = team2
         self.score = None
+        self.status = MatchStatus.NOT_STARTED
     
     def __str__(self):
         """Représentation textuelle du match"""
@@ -18,11 +19,4 @@ class Match:
         return f"{self.team1} vs {self.team2} - Score: {self.score[0]}-{self.score[1]}"
     
     def getstatus(self):
-        if self.score == None:
-            return MatchStatus.NOT_STARTED
-        elif self.score == (0,0):
-            return MatchStatus.STARTED
-        elif self.score[0] > 0 or self.score[1] > 0:
-            return MatchStatus.FINISHED
-        else:
-            raise ValueError
+        return self.status
